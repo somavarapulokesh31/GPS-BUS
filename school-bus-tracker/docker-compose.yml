@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+
+  db:
+    image: postgres:15-alpine
+    container_name: schoolbus_db
+    environment:
+      POSTGRES_USER: bususer
+      POSTGRES_PASSWORD: buspass
+      POSTGRES_DB: schoolbus
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bususer -d schoolbus"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: schoolbus_backend
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://bususer:buspass@db:5432/schoolbus
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    container_name: schoolbus_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
